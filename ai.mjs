@@ -8,7 +8,8 @@ export default async (req) => {
   if (req.method !== 'POST') return new Response('Método no permitido', { status: 405 });
   const user = await verifyReq(req);
   if (!user) return Response.json({ code: 'unauth' }, { status: 401 });
-  const key = env('ANTHROPIC_API_KEY');
+  // Limpia espacios, saltos de línea o comillas que suelen quedar al pegar la llave en Netlify
+  const key = String(env('ANTHROPIC_API_KEY') || '').trim().replace(/^["']+|["']+$/g, '').trim();
   if (!key) return Response.json({ code: 'ai_disabled', error: 'Falta ANTHROPIC_API_KEY' }, { status: 501 });
   let body; try { body = await req.json(); } catch (e) { return Response.json({ code: 'bad_json' }, { status: 400 }); }
   const prompt = String(body.prompt || '');
@@ -25,7 +26,8 @@ export default async (req) => {
     const t = await upstream.text().catch(() => '');
     let type = '', msg = t.slice(0, 400); try { const j = JSON.parse(t); type = (j.error && j.error.type) || ''; msg = (j.error && j.error.message) || msg; } catch (e) { }
     const model = env('ANTHROPIC_MODEL') || DEFAULT_MODEL;
-    const hint = type === 'authentication_error' ? 'La API key no es válida o fue revocada. Revise ANTHROPIC_API_KEY en Netlify y vuelva a desplegar.'
+    const kinfo = `(la llave configurada empieza con «${key.slice(0, 10)}…», termina en «…${key.slice(-4)}» y tiene ${key.length} caracteres)`;
+    const hint = type === 'authentication_error' ? (key.startsWith('sk-ant-api') ? 'La API key no es válida o fue revocada ' + kinfo + '. Compárela con la de la Claude Console o cree una nueva, actualice ANTHROPIC_API_KEY en Netlify y vuelva a desplegar.' : 'El valor de ANTHROPIC_API_KEY no tiene el formato de una API key de Anthropic, que empieza con «sk-ant-api» ' + kinfo + '. Revise que copió la llave correcta.')
       : type === 'permission_error' ? 'La API key no tiene permiso para esta operación (revise su workspace y rol en la Claude Console).'
       : type === 'not_found_error' ? `El modelo «${model}» no existe o no está disponible para su cuenta. Revise ANTHROPIC_MODEL.`
       : /workspace/i.test(msg) ? 'La API key no está asignada a un workspace. Cree una llave asignada a un workspace o defina ANTHROPIC_WORKSPACE_ID en Netlify.'
