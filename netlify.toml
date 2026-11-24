@@ -1,6 +1,10 @@
 [build]
   publish = "public"
-  command = "echo 'Sitio estático: sin compilación'"
+  command = "node organizar.mjs"
+  edge_functions = "netlify/edge-functions"
+
+[build.environment]
+  NODE_VERSION = "20"
 
 [functions]
   directory = "netlify/functions"
